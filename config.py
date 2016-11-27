@@ -2,8 +2,8 @@ class Config:
     env_name = 'Breakout-v0'
     env_type='detail'
     cnn_format = 'NCHW'
-    is_train = False
-    display = True
+    is_train = True
+    display = False
     action_repeat = 1
     use_gpu = True
     scale = 10000

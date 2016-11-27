@@ -43,8 +43,9 @@ class GymEnv:
             self.step(action)
             cumulated_reward += self.reward
             if is_training and start_lives > self.env.ale.lives():
-                cumulated_reward -= 1
-                self.term = True
+                #cumulated_reward -= 1
+                #self.term = True
+                pass
             if self.term:
                 break
         self.reward = cumulated_reward
