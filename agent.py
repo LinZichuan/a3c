@@ -16,8 +16,8 @@ class Agent:
     def __init__(self, sess, config):
         self.width, self.height = 84,84
         self.hist_len = 4
-        self.learning_rate = 0.0001 #0.00025
-        self.thread_num = 16
+        self.learning_rate = 0.01 #0.00025
+        self.thread_num = 8
         self.env_name = 'Breakout-v0'
         self.config = config
         self.gamma = 0.99
@@ -57,6 +57,13 @@ class Agent:
 
         self.state = tf.placeholder('float', [None, self.width, self.height, self.hist_len], 'state')
         print self.state.get_shape()
+        l = Conv2D('conv0', self.state, out_channel=32, kernel_shape=8, stride=4)
+        l = Conv2D('conv1', l, out_channel=64, kernel_shape=4, stride=2)
+        l = Conv2D('conv2', l, out_channel=64, kernel_shape=3, stride=1)
+        l = Linear('l1', l, out_dim=512, nl=tf.nn.relu)
+        self.logits = tf.nn.softmax(Linear('fc-pi', l, out_dim=self.num_actions, nl=tf.identity))
+        self.value = Linear('fc-v', l, 1, nl=tf.identity)
+        '''
         l = Conv2D('conv0', self.state, out_channel=32, kernel_shape=5)
         l = MaxPooling('pool0', l, 2)
         l = Conv2D('conv1', l, out_channel=32, kernel_shape=5)
@@ -69,6 +76,7 @@ class Agent:
         #l = tf.nn.relu(l, name='relu')
         self.logits = tf.nn.softmax(Linear('fc-pi', l, out_dim=self.num_actions, nl=tf.identity))
         self.value = Linear('fc-v', l, 1, nl=tf.identity)
+        '''
 
 
     def sample_policy_action(self, num_actions, probs):
@@ -78,10 +86,12 @@ class Agent:
         """
         # Subtract a tiny value from probabilities in order to avoid
         # "ValueError: sum(pvals[:-1]) > 1.0" in numpy.multinomial
-        probs = probs - np.finfo(np.float32).epsneg
+        #probs = probs - np.finfo(np.float32).epsneg
 
-        histogram = np.random.multinomial(1, probs)
-        action_index = int(np.nonzero(histogram)[0])
+        #histogram = np.random.multinomial(1, probs)
+        #action_index = int(np.nonzero(histogram)[0])
+        action_index = np.argmax(probs)
+        print action_index
         return action_index 
 
 
