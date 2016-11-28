@@ -17,7 +17,7 @@ class Agent:
         self.width, self.height = 84,84
         self.hist_len = 4
         self.learning_rate = 0.0001 #0.00025
-        self.thread_num = 8
+        self.thread_num = 32
         self.env_name = 'Breakout-v0'
         self.config = config
         self.gamma = 0.99
@@ -49,7 +49,6 @@ class Agent:
                 name='total_loss')
 
         self.minimize = optimizer.minimize(self.total_loss)
-        #return self.state, self.a_t_place, self.R_t_place, self.minimize
     
     def build_policy_and_value_network(self):
         data_format = 'NHWC'
@@ -63,37 +62,10 @@ class Agent:
         l = Linear('l1', l, out_dim=512, nl=tf.nn.relu)
         self.logits = tf.nn.softmax(Linear('fc-pi', l, out_dim=self.num_actions, nl=tf.identity))
         self.value = Linear('fc-v', l, 1, nl=tf.identity)
-        '''
-        l = Conv2D('conv0', self.state, out_channel=32, kernel_shape=5)
-        l = MaxPooling('pool0', l, 2)
-        l = Conv2D('conv1', l, out_channel=32, kernel_shape=5)
-        l = MaxPooling('pool1', l, 2)
-        l = Conv2D('conv2', l, out_channel=64, kernel_shape=4)
-        l = MaxPooling('pool2', l, 2)
-        l = Conv2D('conv3', l, out_channel=64, kernel_shape=3)
-
-        l = Linear('linear1', l, out_dim=512, nl=tf.identity)
-        #l = tf.nn.relu(l, name='relu')
-        self.logits = tf.nn.softmax(Linear('fc-pi', l, out_dim=self.num_actions, nl=tf.identity))
-        self.value = Linear('fc-v', l, 1, nl=tf.identity)
-        '''
-
 
     def sample_policy_action(self, num_actions, probs):
-        """
-        Sample an action from an action probability distribution output by
-        the policy network.
-        """
-        # Subtract a tiny value from probabilities in order to avoid
-        # "ValueError: sum(pvals[:-1]) > 1.0" in numpy.multinomial
-        #probs = probs - np.finfo(np.float32).epsneg
-
-        #histogram = np.random.multinomial(1, probs)
-        #action_index = int(np.nonzero(histogram)[0])
         action_index = np.random.choice(num_actions, p=probs)
-        #print action_index
         return action_index 
-
 
     def thread_learning(self, thread_id):
         #start_thread
@@ -131,7 +103,6 @@ class Agent:
                 a_batch.append(a_t)
                 #get reward and s_t_plus_1
                 s_t_plus_1, r_t, terminal = env.act(action_index)
-                #env.env.render()
                 ep_reward += r_t
                 history[:-1] = history[1:]
                 history[-1] = s_t_plus_1
@@ -146,7 +117,6 @@ class Agent:
             for i in xrange(t_start, t): #from back to front
                 R_t = r_batch[t-i-1] + self.gamma * R_t
                 R_batch[t-i-1] = R_t
-                #R_batch.append(R_t)
 
             s_batch = np.transpose(s_batch, (0,2,3,1))
             _, loss = self.sess.run([self.minimize, self.total_loss], feed_dict={
@@ -170,7 +140,6 @@ class Agent:
                 ep_t = 0
 
             #async update d_w and d_v to w and v
-        pass
 
     def train(self):
         self.sess.run(tf.initialize_all_variables())
@@ -187,8 +156,6 @@ class Agent:
             thread.join()
 
 
-
-
 if __name__ == '__main__':
 
     with tf.Session() as sess:
@@ -197,13 +164,4 @@ if __name__ == '__main__':
         if agent.is_train:
             agent.train()
         
-
-
-
-
-
-
-
-
-
 
