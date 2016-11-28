@@ -5,6 +5,7 @@ from gymenv import GymEnv
 import time
 from config import Config
 import numpy as np
+from layers import Conv2D, MaxPooling, Linear
 
 
 T_MAX = 80000000
@@ -16,7 +17,7 @@ class Agent:
         self.width, self.height = 84,84
         self.hist_len = 4
         self.learning_rate = 0.0001 #0.00025
-        self.thread_num = 4
+        self.thread_num = 8
         self.env_name = 'Breakout-v0'
         self.config = config
         self.gamma = 0.99
@@ -58,11 +59,24 @@ class Agent:
         return self.state, self.a_t_place, self.R_t_place, self.minimize
     
     def build_policy_and_value_network(self):
-        data_format = 'NCHW'
+        data_format = 'NHWC'
         init = tf.truncated_normal_initializer(0, 0.02)
 
-        self.state = tf.placeholder('float', [None, self.hist_len, self.width, self.height], 'state')
+        self.state = tf.placeholder('float', [None, self.width, self.height, self.hist_len], 'state')
+        print self.state.get_shape()
+        l = Conv2D('conv0', self.state, out_channel=32, kernel_shape=5)
+        l = MaxPooling('pool0', l, 2)
+        l = Conv2D('conv1', l, out_channel=32, kernel_shape=5)
+        l = MaxPooling('pool1', l, 2)
+        l = Conv2D('conv2', l, out_channel=64, kernel_shape=4)
+        l = MaxPooling('pool2', l, 2)
+        l = Conv2D('conv3', l, out_channel=64, kernel_shape=3)
 
+        l = Linear('linear1', l, out_dim=512, nl=tf.identity)
+        #l = tf.nn.relu(l, name='relu')
+        self.action_probs = tf.nn.softmax(Linear('fc-pi', l, out_dim=self.num_actions, nl=tf.identity))
+        self.state_value = Linear('fc-v', l, 1, nl=tf.identity)
+        '''
         w1 = tf.get_variable('w1', [8,8,self.hist_len,16], initializer=init)
         b1 = tf.get_variable('b1', [16], initializer=init)
         conv1 = tf.nn.conv2d(self.state, w1, [1,1,4,4], 'VALID', data_format=data_format)
@@ -92,7 +106,7 @@ class Agent:
         w5 = tf.get_variable('w5', [256, 1], initializer=init)
         b5 = tf.get_variable('b5', [1], initializer=init)
         self.state_value = tf.nn.bias_add(tf.matmul(out3, w5), b5)
-
+        '''
     def sample_policy_action(self, num_actions, probs):
         """
         Sample an action from an action probability distribution output by
@@ -135,7 +149,7 @@ class Agent:
             r_batch = []
             while not terminal and (t - t_start) != t_max:
                 #use policy network to choose a_t
-                probs = self.sess.run(self.action_probs, feed_dict={self.state: [history]})[0] ##TODO
+                probs = self.sess.run(self.action_probs, feed_dict={self.state: [np.transpose(history, (1,2,0))]})[0] ##TODO
                 action_index = self.sample_policy_action(self.num_actions, probs)
                 a_t = np.zeros([self.num_actions]) #TODO
                 a_t[action_index] = 1
@@ -152,13 +166,14 @@ class Agent:
                 T += 1
                 ep_t += 1
                 s_t = s_t_plus_1
-            R_t = 0 if terminal else self.sess.run(self.state_value, feed_dict={self.state: [history]})[0][0] #V(s_t_plus_1)
+            R_t = 0 if terminal else self.sess.run(self.state_value, feed_dict={self.state: [np.transpose(history, (1,2,0))]})[0][0] #V(s_t_plus_1)
             R_batch = np.zeros(t)
             for i in xrange(t-1, t_start): #from back to front
                 R_t = r_batch[i] + self.gamma * R_t
                 R_batch[i] = R_t
                 #R_batch.append(R_t)
 
+            s_batch = np.transpose(s_batch, (0,2,3,1))
             _, loss = self.sess.run([self.minimize, self.total_loss], feed_dict={
                 self.R_t_place: R_batch, self.a_t_place: a_batch, self.state: s_batch
             })
