@@ -16,15 +16,15 @@ class Agent:
     def __init__(self, sess, config):
         self.width, self.height = 84,84
         self.hist_len = 4
-        self.learning_rate = 0.01 #0.00025
+        self.learning_rate = 0.0001 #0.00025
         self.thread_num = 8
         self.env_name = 'Breakout-v0'
         self.config = config
         self.gamma = 0.99
         self.is_train = True
         self.env = GymEnv(self.config)
-        self.num_actions = 3 #self.env.action_size
-        self.graph = self.build_graph()
+        self.num_actions = self.env.action_size
+        self.build_graph()
         self.saver = tf.train.Saver()
         self.sess = sess
 
@@ -49,11 +49,11 @@ class Agent:
                 name='total_loss')
 
         self.minimize = optimizer.minimize(self.total_loss)
-        return self.state, self.a_t_place, self.R_t_place, self.minimize
+        #return self.state, self.a_t_place, self.R_t_place, self.minimize
     
     def build_policy_and_value_network(self):
         data_format = 'NHWC'
-        init = tf.truncated_normal_initializer(0, 0.02)
+        #init = tf.truncated_normal_initializer(0, 0.02)
 
         self.state = tf.placeholder('float', [None, self.width, self.height, self.hist_len], 'state')
         print self.state.get_shape()
@@ -90,8 +90,8 @@ class Agent:
 
         #histogram = np.random.multinomial(1, probs)
         #action_index = int(np.nonzero(histogram)[0])
-        action_index = np.argmax(probs)
-        print action_index
+        action_index = np.random.choice(num_actions, p=probs)
+        #print action_index
         return action_index 
 
 
@@ -143,9 +143,9 @@ class Agent:
                 s_t = s_t_plus_1
             R_t = 0 if terminal else self.sess.run(self.value, feed_dict={self.state: [np.transpose(history, (1,2,0))]})[0][0] #V(s_t_plus_1)
             R_batch = np.zeros(t)
-            for i in xrange(t-1, t_start): #from back to front
-                R_t = r_batch[i] + self.gamma * R_t
-                R_batch[i] = R_t
+            for i in xrange(t_start, t): #from back to front
+                R_t = r_batch[t-i-1] + self.gamma * R_t
+                R_batch[t-i-1] = R_t
                 #R_batch.append(R_t)
 
             s_batch = np.transpose(s_batch, (0,2,3,1))
@@ -163,6 +163,7 @@ class Agent:
             if terminal:
                 s_t, _, _, _ = env.newRandomGame()
                 terminal = False
+                history = [s_t for _ in xrange(4)]
                 print "THREAD:", thread_id, "/ TIME:", T, "/ REWARD:", ep_reward
                 #reset
                 ep_reward = 0
